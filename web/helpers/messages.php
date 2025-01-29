@@ -1,4 +1,15 @@
 <?php
+function renderPage($content) {
+    return "<!DOCTYPE html>
+            <html>
+            <head>
+                <link rel='stylesheet' href='/assets/css/style.css'>
+            </head>
+            <body>
+                $content
+            </body>
+            </html>";
+}
 
 // Funzione per la stampa di un messaggio
 function showMessage ($message, $type = 'info') {

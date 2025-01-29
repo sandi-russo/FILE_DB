@@ -1,8 +1,7 @@
 <?php
 
-require_once 'constants.php';
+require_once __DIR__ . '/../config/constants.php';
 require_once HELPERS_DIR . '/messages.php';
-
 class Database
 {
     private $servername = 'db';
@@ -31,6 +30,7 @@ class Database
         return $this->conn;
     }
 
+
     public function close()
     {
         // Verifico se sono connesso al db
@@ -41,6 +41,7 @@ class Database
         }
     }
 
+    // Funzione generica per eseguire query
     // Funzione generica per eseguire query
     private function eseguiQuery($query)
     {
@@ -55,185 +56,257 @@ class Database
     // Funzione per creare le tabelle nel db
     public function creaTabelle()
     {
-        // Definizione delle query per la crezione delle tabelle
+        // Definizione delle query per la creazione delle tabelle
         $queries = [
-            // Tabella UNITA_ORGANIZZATIVA
-            "CREATE TABLE IF NOT EXISTS UNITA_ORGANIZZATIVA (
-                    Codice VARCHAR(20) PRIMARY KEY,
-                    Nome VARCHAR(255) NOT NULL
-                )",
+            // Tabella AMMINISTRATORE
+            "CREATE TABLE IF NOT EXISTS AMMINISTRATORE (
+                Id INT AUTO_INCREMENT PRIMARY KEY,
+                Nome VARCHAR(35) NOT NULL,
+                Cognome VARCHAR(35) NOT NULL,
+                Email VARCHAR(100) NOT NULL,
+                Password VARCHAR(100) NOT NULL,
+                Precaricato BOOLEAN NOT NULL
+            )",
 
-            // Tabella SETTORE_SCIENTIFICO
-            "CREATE TABLE IF NOT EXISTS SETTORE_SCIENTIFICO (
-                      SSD VARCHAR(20) PRIMARY KEY,
-                      NomeSettore VARCHAR(100) NOT NULL
-                  )",
+            // Tabella UTENTE
+            "CREATE TABLE IF NOT EXISTS UTENTE (
+                CodiceFiscale CHAR(16) NOT NULL,
+                Email VARCHAR(100) NOT NULL,
+                Nome VARCHAR(35) NOT NULL,
+                Cognome VARCHAR(35) NOT NULL,
+                Password VARCHAR(100) NOT NULL,
+                IdAmministratore INT,
+                PRIMARY KEY (CodiceFiscale, Email),
+                FOREIGN KEY (IdAmministratore) REFERENCES AMMINISTRATORE(Id)
+            )",
+
+            // Tabella STUDENTE
+            "CREATE TABLE IF NOT EXISTS STUDENTE (
+                Id INT AUTO_INCREMENT PRIMARY KEY,
+                CodiceFiscale CHAR(16) NOT NULL,
+                Email VARCHAR(100) NOT NULL,
+                FOREIGN KEY (CodiceFiscale, Email) REFERENCES UTENTE(CodiceFiscale, Email),
+                UNIQUE (CodiceFiscale, Email)
+            )",
+
+            // Tabella RUOLO
+            "CREATE TABLE IF NOT EXISTS RUOLO (
+                Id INT AUTO_INCREMENT PRIMARY KEY,
+                Nome ENUM('Ricercatore','Associato','Ordinario') NOT NULL,
+                Descrizione TEXT NOT NULL
+            )",
+
+            // Tabella SSD
+            "CREATE TABLE IF NOT EXISTS SSD (
+                Codice VARCHAR(20) PRIMARY KEY,
+                Descrizione TEXT NOT NULL
+            )",
 
             // Tabella DOCENTE
             "CREATE TABLE IF NOT EXISTS DOCENTE (
-                        ID_Docente INT AUTO_INCREMENT PRIMARY KEY,
-                        Nome VARCHAR(50) NOT NULL,
-                        Cognome VARCHAR(50) NOT NULL,
-                        SSD VARCHAR(20) NOT NULL,
-                        Email VARCHAR(100) NOT NULL UNIQUE,
-                        Telefono VARCHAR(20),
-                        Ruolo ENUM('Contratto (50 ore)', 'Ricercatore (80 ore)', 'Associato (100 ore)', 'Ordinario (120 ore)') NOT NULL,
-                        FOREIGN KEY (SSD) REFERENCES SETTORE_SCIENTIFICO(SSD)
-                    )",
+                Matricola INT AUTO_INCREMENT PRIMARY KEY,
+                CodiceFiscale CHAR(16) NOT NULL,
+                Email VARCHAR(100) NOT NULL,
+                IdRuolo INT NOT NULL,
+                CodiceSSD VARCHAR(20) NOT NULL,
+                MatricolaFormattata VARCHAR(6),
+                FOREIGN KEY (CodiceFiscale, Email) REFERENCES UTENTE(CodiceFiscale, Email),
+                FOREIGN KEY (IdRuolo) REFERENCES RUOLO(Id),
+                FOREIGN KEY (CodiceSSD) REFERENCES SSD(Codice),
+                UNIQUE (CodiceFiscale, Email)
+            )",
+
+            // Tabella PREFERENZA_ORARIA
+            "CREATE TABLE IF NOT EXISTS PREFERENZA_ORARIA (
+                Id INT AUTO_INCREMENT PRIMARY KEY,
+                GiornoSettimana ENUM('Lunedì', 'Martedì','Mercoledì','Giovedì','Venerdì') NOT NULL,
+                OraInizio TIME NOT NULL,
+                OraFine TIME NOT NULL,
+                CHECK (OraInizio >= '09:00:00'),
+                CHECK (OraFine <= '18:00:00')
+            )",
+
+            // Tabella SELEZIONE
+            "CREATE TABLE IF NOT EXISTS SELEZIONE (
+                MatricolaDocente INT NOT NULL,
+                IdPreferenzaOraria INT NOT NULL,
+                PRIMARY KEY (MatricolaDocente, IdPreferenzaOraria),
+                FOREIGN KEY (MatricolaDocente) REFERENCES DOCENTE(Matricola),
+                FOREIGN KEY (IdPreferenzaOraria) REFERENCES PREFERENZA_ORARIA(Id)
+            )",
+
+            // Tabella MATERIALE_DIDATTICO
+            "CREATE TABLE IF NOT EXISTS MATERIALE_DIDATTICO (
+                Id INT AUTO_INCREMENT PRIMARY KEY,
+                Descrizione TEXT NOT NULL,
+                Nome VARCHAR(100) NOT NULL,
+                DataCaricamento DATE NOT NULL,
+                MatricolaDocente INT NOT NULL,
+                FOREIGN KEY (MatricolaDocente) REFERENCES DOCENTE(Matricola)
+            )",
+
+            // Tabella SEDE
+            "CREATE TABLE IF NOT EXISTS SEDE (
+                Id INT AUTO_INCREMENT PRIMARY KEY,
+                Nome VARCHAR(50) NOT NULL,
+                Indirizzo VARCHAR(100) NOT NULL
+            )",
 
             // Tabella EDIFICIO
             "CREATE TABLE IF NOT EXISTS EDIFICIO (
-                      ID_Edificio VARCHAR(40) PRIMARY KEY,
-                      Nome VARCHAR(100) NOT NULL,
-                      Indirizzo VARCHAR(200) NOT NULL,
-                      CapacitaTotale INT NOT NULL CHECK (CapacitaTotale > 0)
-                  )",
+                Id INT AUTO_INCREMENT PRIMARY KEY,
+                Descrizione TEXT NOT NULL,
+                IdSede INT NOT NULL,
+                FOREIGN KEY (IdSede) REFERENCES SEDE(Id)
+            )",
 
-            // Tabella AULA
-            "CREATE TABLE IF NOT EXISTS AULA (
-                      ID_Aula INT AUTO_INCREMENT PRIMARY KEY,
-                      Nome VARCHAR(50) NOT NULL,
-                      Capacita INT NOT NULL CHECK (Capacita > 0),
-                      Tipologia ENUM('teorica', 'laboratorio') NOT NULL,
-                      Edificio VARCHAR(40),
-                      Attrezzature TEXT,
-                      FOREIGN KEY (Edificio) REFERENCES EDIFICIO(ID_Edificio)
-                  )",
+            // Tabella AULE
+            "CREATE TABLE IF NOT EXISTS AULE (
+                Id INT AUTO_INCREMENT PRIMARY KEY,
+                Nome VARCHAR(50) NOT NULL,
+                Capienza INT NOT NULL,
+                Tipologia ENUM('Aula','Laboratorio'),
+                IdEdificio INT NOT NULL,
+                FOREIGN KEY (IdEdificio) REFERENCES EDIFICIO(Id)
+            )",
+
+            // Tabella DOTAZIONE
+            "CREATE TABLE IF NOT EXISTS DOTAZIONE (
+                Codice VARCHAR(20) PRIMARY KEY,
+                Nome VARCHAR(50) NOT NULL,
+                Descrizione TEXT NOT NULL
+            )",
+
+            // Tabella INCLUSIONE
+            "CREATE TABLE IF NOT EXISTS INCLUSIONE (
+                IdAula INT NOT NULL,
+                CodiceDotazione VARCHAR(20) NOT NULL,
+                PRIMARY KEY (IdAula, CodiceDotazione),
+                FOREIGN KEY (IdAula) REFERENCES AULE(Id),
+                FOREIGN KEY (CodiceDotazione) REFERENCES DOTAZIONE(Codice)
+            )",
+
+            // Tabella SCHERMO
+            "CREATE TABLE IF NOT EXISTS SCHERMO (
+                Id INT AUTO_INCREMENT PRIMARY KEY,
+                Descrizione TEXT NOT NULL,
+                IdAula INT NOT NULL,
+                FOREIGN KEY (IdAula) REFERENCES AULE(Id)
+            )",
+
+            // Tabella CHIAVE
+            "CREATE TABLE IF NOT EXISTS CHIAVE (
+                Id INT AUTO_INCREMENT PRIMARY KEY,
+                Descrizione TEXT NOT NULL,
+                DataOraUtilizzo DATETIME NOT NULL,
+                IdAula INT NOT NULL,
+                MatricolaDocente INT,
+                FOREIGN KEY (IdAula) REFERENCES AULE(Id),
+                FOREIGN KEY (MatricolaDocente) REFERENCES DOCENTE(Matricola)
+            )",
+
+            // Tabella PRENOTAZIONE
+            "CREATE TABLE IF NOT EXISTS PRENOTAZIONE (
+                MatricolaDocente INT NOT NULL,
+                IdAula INT NOT NULL,
+                GiornoSettimana ENUM('Lunedì', 'Martedì','Mercoledì','Giovedì','Venerdì') NOT NULL,
+                OraInizio TIME NOT NULL,
+                OraFine TIME NOT NULL,
+                CHECK (OraInizio >= '09:00:00'),
+                CHECK (OraFine <= '18:00:00'),
+                FOREIGN KEY (IdAula) REFERENCES AULE(Id),
+                FOREIGN KEY (MatricolaDocente) REFERENCES DOCENTE(Matricola),
+                PRIMARY KEY (MatricolaDocente, IdAula, GiornoSettimana, OraInizio, OraFine)
+            )",
+
+            // Tabella DIPARTIMENTO
+            "CREATE TABLE IF NOT EXISTS DIPARTIMENTO (
+                Codice VARCHAR(20) PRIMARY KEY,
+                Nome VARCHAR(50) NOT NULL,
+                Descrizione TEXT NOT NULL
+            )",
 
             // Tabella CORSO_DI_STUDIO
             "CREATE TABLE IF NOT EXISTS CORSO_DI_STUDIO (
-                    Codice VARCHAR(25) PRIMARY KEY,
-                    Nome VARCHAR(100) NOT NULL,
-                    Percorso VARCHAR(100),
-                    AnnoCorso INT NOT NULL
-                )",
+                Nome VARCHAR(50) NOT NULL PRIMARY KEY,
+                Durata INT NOT NULL,
+                CHECK (Durata BETWEEN 1 AND 6),
+                Descrizione TEXT NOT NULL,
+                CodiceDipartimento VARCHAR(20) NOT NULL,
+                FOREIGN KEY (CodiceDipartimento) REFERENCES DIPARTIMENTO(Codice)
+            )",
 
-            // Tabella LINGUE
-            "CREATE TABLE IF NOT EXISTS LINGUE (
-                      CodiceLingua VARCHAR(5) PRIMARY KEY,
-                      NomeLingua VARCHAR(50) NOT NULL
-                  )",
-
-            // Tabella PERIODO
-            "CREATE TABLE IF NOT EXISTS PERIODO (
-                      Periodo VARCHAR(50) PRIMARY KEY,
-                      DataInizio DATE NOT NULL,
-                      DataFine DATE NOT NULL
-                  )",
+            // Tabella APPARTENENZA
+            "CREATE TABLE IF NOT EXISTS APPARTENENZA (
+                IdStudente INT NOT NULL,
+                NomeCorsoDiStudio VARCHAR(50) NOT NULL,
+                FOREIGN KEY (IdStudente) REFERENCES STUDENTE(Id),
+                FOREIGN KEY (NomeCorsoDiStudio) REFERENCES CORSO_DI_STUDIO(Nome),
+                PRIMARY KEY (IdStudente, NomeCorsoDiStudio)
+            )",
 
             // Tabella INSEGNAMENTO
             "CREATE TABLE IF NOT EXISTS INSEGNAMENTO (
-                      Codice VARCHAR(10) PRIMARY KEY,
-                      Nome VARCHAR(100) NOT NULL,
-                      AnnoOfferta INT NOT NULL,
-                      CFU INT NOT NULL CHECK (CFU > 0),
-                      Lingua VARCHAR(5) NOT NULL,
-                      SSD VARCHAR(10) NOT NULL,
-                      Descrizione TEXT,
-                      MetodoEsame TEXT,
-                      DocenteTitolare INT,
-                      CorsoDiStudio VARCHAR(10),
-                      Periodo VARCHAR(50) NOT NULL,
-                      FOREIGN KEY (Lingua) REFERENCES LINGUE(CodiceLingua),
-                      FOREIGN KEY (SSD) REFERENCES SETTORE_SCIENTIFICO(SSD),
-                      FOREIGN KEY (DocenteTitolare) REFERENCES DOCENTE(ID_Docente),
-                      FOREIGN KEY (CorsoDiStudio) REFERENCES CORSO_DI_STUDIO(Codice),
-                      FOREIGN KEY (Periodo) REFERENCES PERIODO(Periodo)
-                  )",
-
-            // Tabella DISPONIBILITA_DOCENTE
-            "CREATE TABLE IF NOT EXISTS DISPONIBILITA_DOCENTE (
-                    ID_Disponibilita INT AUTO_INCREMENT PRIMARY KEY,
-                    ID_Docente INT NOT NULL,
-                    Giorno INT NOT NULL CHECK (Giorno BETWEEN 1 AND 7),
-                    OraInizio INT NOT NULL CHECK (OraInizio BETWEEN 540 AND 960),
-                    OraFine INT NOT NULL CHECK (OraFine BETWEEN 660 AND 1080),
-                    FOREIGN KEY (ID_Docente) REFERENCES DOCENTE(ID_Docente)
-                )",
-
-            // Tabella DISPONIBILITA_AULA
-            "CREATE TABLE IF NOT EXISTS DISPONIBILITA_AULA (
-                      ID_Aula INT NOT NULL,
-                      Giorno ENUM('lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi') NOT NULL,
-                      OraInizio TIME NOT NULL CHECK (OraInizio >= '09:00:00' AND OraInizio <= '16:00:00'),
-                      OraFine TIME NOT NULL CHECK (OraFine >= '11:00:00' AND OraFine <= '18:00:00'),
-                      TipologiaUtilizzo ENUM('lezione', 'laboratorio', 'esame') NOT NULL,
-                      PRIMARY KEY (ID_Aula, Giorno, OraInizio),
-                      FOREIGN KEY (ID_Aula) REFERENCES AULA(ID_Aula)
-                  )",
-
-            // Tabella ORARIO
-            "CREATE TABLE IF NOT EXISTS ORARIO (
-                    ID_Orario INT AUTO_INCREMENT PRIMARY KEY,
-                    Giorno INT NOT NULL CHECK (Giorno BETWEEN 1 AND 7), -- 1=Lunedi, 7=Domenica
-                    OraInizio INT NOT NULL CHECK (OraInizio BETWEEN 540 AND 960), -- Minuti dalla mezzanotte (9:00-16:00)
-                    OraFine INT NOT NULL CHECK (OraFine BETWEEN 660 AND 1080), -- Minuti dalla mezzanotte (11:00-18:00)
-                    Aula INT NOT NULL,
-                    Insegnamento VARCHAR(10) NOT NULL,
-                    Docente INT NOT NULL,
-                    Periodo VARCHAR(50) NOT NULL,
-                    FOREIGN KEY (Aula) REFERENCES AULA(ID_Aula),
-                    FOREIGN KEY (Insegnamento) REFERENCES INSEGNAMENTO(Codice),
-                    FOREIGN KEY (Docente) REFERENCES DOCENTE(ID_Docente),
-                    FOREIGN KEY (Periodo) REFERENCES PERIODO(Periodo)
-                )",
-
-            // Tabella GRUPPO_STUDENTI
-            "CREATE TABLE IF NOT EXISTS GRUPPO_STUDENTI (
-                    ID_Gruppo INT AUTO_INCREMENT PRIMARY KEY,
-                    CodiceCorsoDiStudio VARCHAR(25) NOT NULL,
-                    NumeroStudenti INT NOT NULL CHECK (NumeroStudenti > 0),
-                    FOREIGN KEY (CodiceCorsoDiStudio) REFERENCES CORSO_DI_STUDIO(Codice)
-                )",
-
-            // Tabella CARICO_LAVORO_DOCENTE
-            "CREATE TABLE IF NOT EXISTS CARICO_LAVORO_DOCENTE (
-                      ID_Docente INT NOT NULL,
-                      Periodo VARCHAR(50) NOT NULL,
-                      OreTotali INT NOT NULL CHECK (OreTotali >= 0),
-                      MaxOreConsentite INT NOT NULL CHECK (MaxOreConsentite > 0),
-                      PRIMARY KEY (ID_Docente, Periodo),
-                      FOREIGN KEY (ID_Docente) REFERENCES DOCENTE(ID_Docente),
-                      FOREIGN KEY (Periodo) REFERENCES PERIODO(Periodo)
-                  )",
-
-            // Tabella AMMINISTRATORE
-            "CREATE TABLE IF NOT EXISTS AMMINISTRATORE (
-                ID_Amministratore INT AUTO_INCREMENT PRIMARY KEY,
+                Codice VARCHAR(20) PRIMARY KEY,
                 Nome VARCHAR(50) NOT NULL,
-                Cognome VARCHAR(50) NOT NULL,
-                Email VARCHAR(100) NOT NULL UNIQUE,
-                Password VARCHAR(255) NOT NULL
+                CFU INT NOT NULL,
+                Lingua VARCHAR(20) NOT NULL,
+                Tipologia ENUM('Lezione','Esercitazione','Laboratorio') NOT NULL,
+                IndTempo ENUM('I Semestre','II Semestre','Annuale') NOT NULL,
+                OreSettimanali INT NOT NULL,
+                NumTotaliOre INT NOT NULL,
+                NomeCorsoDiStudio VARCHAR(50) NOT NULL,
+                FOREIGN KEY (NomeCorsoDiStudio) REFERENCES CORSO_DI_STUDIO(Nome)
             )",
 
-            // Tabella ORARIO_STORICO
-            "CREATE TABLE IF NOT EXISTS ORARIO_STORICO (
-                      ID_Storico INT AUTO_INCREMENT PRIMARY KEY,
-                      ID_Orario INT NOT NULL,
-                      Giorno DATE NOT NULL,
-                      OraInizio TIME NOT NULL,
-                      OraFine TIME NOT NULL,
-                      Aula INT NOT NULL,
-                      Insegnamento VARCHAR(10) NOT NULL,
-                      Docente INT NOT NULL,
-                      DataModifica DATETIME NOT NULL,
-                      ModificatoDa INT NOT NULL,
-                      FOREIGN KEY (ID_Orario) REFERENCES ORARIO(ID_Orario),
-                      FOREIGN KEY (ModificatoDa) REFERENCES AMMINISTRATORE(ID_Amministratore)
-                  )",
+            // Tabella INERENZA
+            "CREATE TABLE IF NOT EXISTS INERENZA (
+                CodiceInsegnamento VARCHAR(20) NOT NULL,
+                CodiceSSD VARCHAR(20) NOT NULL,
+                FOREIGN KEY (CodiceInsegnamento) REFERENCES INSEGNAMENTO(Codice),
+                FOREIGN KEY (CodiceSSD) REFERENCES SSD(Codice),
+                PRIMARY KEY (CodiceInsegnamento, CodiceSSD)
+            )",
 
-            // Tabella MODIFICA
-            "CREATE TABLE IF NOT EXISTS MODIFICA (
-                      ID_Modifica INT AUTO_INCREMENT PRIMARY KEY,
-                      AmministratoreID INT NOT NULL,
-                      Oggetto VARCHAR(200),
-                      DataOra DATETIME NOT NULL,
-                      Dettaglio TEXT,
-                      FOREIGN KEY (AmministratoreID) REFERENCES AMMINISTRATORE(ID_Amministratore)
-                  )"
+            // Tabella SVOLGIMENTO
+            "CREATE TABLE IF NOT EXISTS SVOLGIMENTO (
+                CodiceInsegnamento VARCHAR(20) NOT NULL,
+                IdAula INT NOT NULL,
+                GiornoSettimana ENUM('Lunedì', 'Martedì','Mercoledì','Giovedì','Venerdì') NOT NULL,
+                OraInizio TIME NOT NULL,
+                OraFine TIME NOT NULL,
+                CHECK (OraInizio >= '09:00:00'),
+                CHECK (OraFine <= '18:00:00'),
+                FOREIGN KEY (IdAula) REFERENCES AULE(Id),
+                FOREIGN KEY (CodiceInsegnamento) REFERENCES INSEGNAMENTO(Codice),
+                PRIMARY KEY (CodiceInsegnamento, IdAula, GiornoSettimana, OraInizio, OraFine)
+            )",
+
+            // Tabella EVENTO
+            "CREATE TABLE IF NOT EXISTS EVENTO (
+                Id INT AUTO_INCREMENT PRIMARY KEY,
+                Nome VARCHAR(50) NOT NULL,
+                Descrizione TEXT NOT NULL,
+                DataEvento DATE NOT NULL,
+                OraInizio TIME NOT NULL,
+                OraFine TIME NOT NULL,
+                CHECK (OraInizio >= '09:00:00'),
+                CHECK (OraFine <= '18:00:00'),
+                IdAula INT NOT NULL,
+                FOREIGN KEY (IdAula) REFERENCES AULE(Id)
+            )",
+
+            // Tabella ISCRIZIONE
+            "CREATE TABLE IF NOT EXISTS ISCRIZIONE (
+                IdEvento INT NOT NULL,
+                IdStudente INT NOT NULL,
+                FOREIGN KEY (IdEvento) REFERENCES EVENTO(Id),
+                FOREIGN KEY (IdStudente) REFERENCES STUDENTE(Id),
+                PRIMARY KEY (IdEvento, IdStudente)
+            )"
         ];
 
-        // Esegui tutte le query per la crezione delle tabelle
+        // Esegui tutte le query per la creazione delle tabelle
         foreach ($queries as $query) {
             $this->eseguiQuery($query);
         }
@@ -244,71 +317,118 @@ class Database
     {
         // Definizione delle query per la creazione dei trigger
         $triggers = [
-            "CREATE TRIGGER trg_chk_orario_docente
-            BEFORE INSERT ON DISPONIBILITA_DOCENTE
-            FOR EACH ROW
-            BEGIN
-                IF NEW.OraFine <= NEW.OraInizio THEN
-                    SIGNAL SQLSTATE '45000'
-                    SET MESSAGE_TEXT = 'L\'ora finale non può essere minore o uguale all\'ora di inizio.';
-                END IF;
-            END",
+            // Trigger per aggiornare il campo MatricolaFormattata in DOCENTE
+            "CREATE TRIGGER before_insert_docente
+        BEFORE INSERT ON DOCENTE
+        FOR EACH ROW
+        BEGIN
+            SET NEW.MatricolaFormattata = LPAD(NEW.Matricola, 6, '0');
+        END",
 
-            "CREATE TRIGGER trg_chk_orario_aula
-            BEFORE INSERT ON DISPONIBILITA_AULA
-            FOR EACH ROW
-            BEGIN
-                IF NEW.OraFine <= NEW.OraInizio THEN
-                    SIGNAL SQLSTATE '45000'
-                    SET MESSAGE_TEXT = 'L\'ora finale non può essere minore o uguale all\'ora di inizio.';
-                END IF;
-            END",
+            // Trigger per verificare l'orario di inizio e fine in PREFERENZA_ORARIA
+            "CREATE TRIGGER before_insert_preferenza_oraria
+        BEFORE INSERT ON PREFERENZA_ORARIA
+        FOR EACH ROW
+        BEGIN
+            IF NEW.OraInizio < '09:00:00' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'OraInizio deve essere maggiore o uguale alle 09:00';
+            END IF;
+            IF NEW.OraFine > '18:00:00' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'OraFine deve essere minore o uguale alle 18:00';
+            END IF;
+        END",
 
-            "CREATE TRIGGER trg_chk_capacita_aula
-            BEFORE INSERT ON AULA
-            FOR EACH ROW
-            BEGIN
-                DECLARE capacita_edificio INT;
+            // Trigger per verificare l'orario di inizio e fine in PRENOTAZIONE
+            "CREATE TRIGGER before_insert_prenotazione
+        BEFORE INSERT ON PRENOTAZIONE
+        FOR EACH ROW
+        BEGIN
+            IF NEW.OraInizio < '09:00:00' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'OraInizio deve essere maggiore o uguale alle 09:00';
+            END IF;
+            IF NEW.OraFine > '18:00:00' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'OraFine deve essere minore o uguale alle 18:00';
+            END IF;
+        END",
 
-                -- Ottieni la capacità totale dell'edificio associato
-                SELECT CapacitaTotale INTO capacita_edificio
-                FROM EDIFICIO
-                WHERE ID_Edificio = NEW.Edificio;
+            // Trigger per verificare l'orario di inizio e fine in SVOLGIMENTO
+            "CREATE TRIGGER before_insert_svolgimento
+        BEFORE INSERT ON SVOLGIMENTO
+        FOR EACH ROW
+        BEGIN
+            IF NEW.OraInizio < '09:00:00' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'OraInizio deve essere maggiore o uguale alle 09:00';
+            END IF;
+            IF NEW.OraFine > '18:00:00' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'OraFine deve essere minore o uguale alle 18:00';
+            END IF;
+        END",
 
-                -- Verifica che la Capacita dell'aula non superi la CapacitaTotale dell'edificio
-                IF NEW.Capacita > capacita_edificio THEN
-                    SIGNAL SQLSTATE '45000'
-                    SET MESSAGE_TEXT = 'La capacità dell\'aula non può superare la capacità totale dell\'edificio.';
-                END IF;
-            END",
+            // Trigger per verificare l'orario di inizio e fine in EVENTO
+            "CREATE TRIGGER before_insert_evento
+        BEFORE INSERT ON EVENTO
+        FOR EACH ROW
+        BEGIN
+            IF NEW.OraInizio < '09:00:00' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'OraInizio deve essere maggiore o uguale alle 09:00';
+            END IF;
+            IF NEW.OraFine > '18:00:00' THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'OraFine deve essere minore o uguale alle 18:00';
+            END IF;
+        END",
 
-            "CREATE TRIGGER trg_chk_date_periodo
-            BEFORE INSERT ON PERIODO
-            FOR EACH ROW
-            BEGIN
-                IF NEW.DataInizio >= NEW.DataFine THEN
-                    SIGNAL SQLSTATE '45000'
-                    SET MESSAGE_TEXT = 'La data di inizio non può essere uguale o successiva alla data di fine.';
-                END IF;
-            END",
+            // Trigger per verificare la Durata nel CORSO_DI_STUDIO
+            "CREATE TRIGGER before_insert_corso_di_studio
+        BEFORE INSERT ON CORSO_DI_STUDIO
+        FOR EACH ROW
+        BEGIN
+            IF NEW.Durata < 1 OR NEW.Durata > 6 THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Durata deve essere compresa tra 1 e 6';
+            END IF;
+        END",
 
-            "CREATE TRIGGER trg_chk_anno_corso
-            BEFORE INSERT ON CORSO_DI_STUDIO
-            FOR EACH ROW
-            BEGIN
-                IF NEW.AnnoCorso <= 0 THEN
-                    SIGNAL SQLSTATE '45000'
-                    SET MESSAGE_TEXT = 'L\'anno del corso deve essere maggiore di zero.';
-                END IF;
-            END"
+            // Trigger per verificare la Durata nell'update di CORSO_DI_STUDIO
+            "CREATE TRIGGER before_update_corso_di_studio
+        BEFORE UPDATE ON CORSO_DI_STUDIO
+        FOR EACH ROW
+        BEGIN
+            IF NEW.Durata < 1 OR NEW.Durata > 6 THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Durata deve essere compresa tra 1 e 6';
+            END IF;
+        END"
         ];
 
-        // Esegui la query per la creazione dei trigger
+        // Prima elimina i trigger esistenti se ci sono
+        $dropTriggers = [
+            "DROP TRIGGER IF EXISTS before_insert_docente",
+            "DROP TRIGGER IF EXISTS before_insert_preferenza_oraria",
+            "DROP TRIGGER IF EXISTS before_insert_prenotazione",
+            "DROP TRIGGER IF EXISTS before_insert_svolgimento",
+            "DROP TRIGGER IF EXISTS before_insert_evento",
+            "DROP TRIGGER IF EXISTS before_insert_corso_di_studio",
+            "DROP TRIGGER IF EXISTS before_update_corso_di_studio"
+        ];
+
+        // Elimina i trigger esistenti
+        foreach ($dropTriggers as $drop) {
+            $this->eseguiQuery($drop);
+        }
+
+        // Crea i nuovi trigger
         foreach ($triggers as $trigger) {
             $this->eseguiQuery($trigger);
         }
     }
-
 
     // Funzione per inizializzare il db
     public function setupDB()
